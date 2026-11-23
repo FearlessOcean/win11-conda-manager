@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using CondaManager.Core;
 
 namespace CondaManager.Checks;
 
@@ -21,6 +22,22 @@ public static class Program
         {
             Console.Error.Write("requested exit");
             return int.Parse(args[1]);
+        }
+        if (args.Length == 2 && args[0] == "--probe-root")
+        {
+            var result = await new CondaLauncherValidator(new ProcessRunner())
+                .ValidateAsync(args[1], CancellationToken.None);
+            if (result.Installation is { } installation)
+            {
+                Console.WriteLine($"Verified root: {installation.Info.RootPrefix}");
+                Console.WriteLine($"Conda version: {installation.Info.CondaVersion}");
+                Console.WriteLine($"Launcher: {installation.Launcher.ExecutablePath}");
+                return 0;
+            }
+
+            foreach (var failure in result.Failures)
+                Console.Error.WriteLine(failure);
+            return 1;
         }
 
         var methods = Assembly.GetExecutingAssembly().GetTypes()
