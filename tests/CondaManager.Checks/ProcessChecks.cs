@@ -1,0 +1,58 @@
+using System.Text.Json;
+using CondaManager.Core;
+
+namespace CondaManager.Checks;
+
+public static class ProcessChecks
+{
+    [Check("process runner preserves separate arguments, including spaces and Chinese")]
+    public static async Task PreservesArguments()
+    {
+        var launcher = TestLauncher("--echo-args");
+        var arguments = new[] { @"C:\Program Files\Miniconda 根\envs\my env", "--prefix", "含 空格", "quoted \"value\"" };
+
+        var result = await new ProcessRunner().RunAsync(launcher, arguments, TimeSpan.FromSeconds(10), CancellationToken.None);
+
+        Expect.Equal(0, result.ExitCode);
+        Expect.Equal("", result.Stderr);
+        var actual = JsonSerializer.Deserialize<string[]>(result.Stdout);
+        Expect.True(actual is not null, "The test helper must return a JSON argument array.");
+        Expect.Equal(arguments.Length, actual!.Length);
+        for (var index = 0; index < arguments.Length; index++)
+            Expect.Equal(arguments[index], actual[index]);
+    }
+
+    [Check("process runner retains nonzero exit status and stderr")]
+    public static async Task RetainsFailureDetails()
+    {
+        var result = await new ProcessRunner().RunAsync(
+            TestLauncher("--exit"), ["7"], TimeSpan.FromSeconds(10), CancellationToken.None);
+
+        Expect.Equal(7, result.ExitCode);
+        Expect.Equal("requested exit", result.Stderr);
+    }
+
+    [Check("process runner times out a sleeping child")]
+    public static async Task TimesOutSleepingChild()
+    {
+        await Expect.ThrowsAsync<TimeoutException>(() => new ProcessRunner().RunAsync(
+            TestLauncher("--sleep"), ["5000"], TimeSpan.FromMilliseconds(200), CancellationToken.None));
+    }
+
+    [Check("process runner honors user cancellation")]
+    public static async Task HonorsCancellation()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        await Expect.ThrowsAsync<OperationCanceledException>(() => new ProcessRunner().RunAsync(
+            TestLauncher("--sleep"), ["5000"], TimeSpan.FromSeconds(10), cancellation.Token));
+    }
+
+    private static CondaLauncher TestLauncher(string mode)
+    {
+        var executable = Environment.ProcessPath ?? throw new Exception("Test process executable path is unavailable.");
+        var leading = Path.GetFileName(executable).Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase)
+            ? new[] { typeof(Program).Assembly.Location, mode }
+            : new[] { mode };
+        return new CondaLauncher(executable, leading);
+    }
+}
