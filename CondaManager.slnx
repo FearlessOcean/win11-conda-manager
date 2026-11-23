@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/CondaManager.Core/CondaManager.Core.csproj" />
+  <Project Path="src/CondaManager.App/CondaManager.App.csproj" />
+  <Project Path="tests/CondaManager.Checks/CondaManager.Checks.csproj" />
+</Solution>

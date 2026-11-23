@@ -25,6 +25,7 @@
 ## File map
 
 - `.gitignore`: excludes build output, IDE files, and workspace-local .NET caches.
+- `scripts/verify.ps1`: runs offline restore, build, and checks with one MSBuild node to avoid this sandbox's parallel worker failure.
 - `CondaManager.slnx`: solution containing the three projects.
 - `src/CondaManager.Core/CondaManager.Core.csproj`: dependency-free business logic.
 - `src/CondaManager.Core/CondaJson.cs`: strict parsers for `info`, `env list`, and `list` JSON.
@@ -39,7 +40,7 @@
 
 ### Task 1: Repository and JSON contracts
 
-**Files:** Create `.gitignore`, `CondaManager.slnx`, the three `.csproj` files, `CondaModels.cs`, `CondaJson.cs`, `tests/CondaManager.Checks/Program.cs`, and `tests/CondaManager.Checks/JsonChecks.cs`.
+**Files:** Create `.gitignore`, `CondaManager.slnx`, the three `.csproj` files, a minimal `App.xaml`/`MainWindow.xaml` scaffold, `CondaModels.cs`, `CondaJson.cs`, `tests/CondaManager.Checks/Program.cs`, and `tests/CondaManager.Checks/JsonChecks.cs`.
 
 **Interfaces:**
 - `CondaInfo(string RootPrefix, string CondaVersion, IReadOnlyList<string> EnvsDirs)`.
@@ -47,10 +48,10 @@
 - `CondaJson.ParseInfo(string json)`, `ParseEnvironmentPrefixes(string json)`, `ParsePackages(string json)`.
 - `CondaDataException` for invalid or malformed Conda JSON.
 
-- [ ] **Step 1: Add projects and a test runner.** Use SDK-style projects without package references. `Core` and `Checks` target `net10.0`; `App` targets `net10.0-windows` with `<UseWPF>true</UseWPF>` and `<OutputType>WinExe</OutputType>`. `Checks` references `Core`; `App` references `Core`. Add a console runner whose assertion failures set nonzero exit status.
+- [ ] **Step 1: Add projects and a test runner.** Use SDK-style projects without package references. `Core` and `Checks` target `net10.0`; `App` targets `net10.0-windows` with `<UseWPF>true</UseWPF>` and `<OutputType>WinExe</OutputType>`. `Checks` references `Core`; `App` references `Core`. Include a bare `App.xaml` and `MainWindow.xaml` so the solution builds before Task 4. Add a console runner whose assertion failures set nonzero exit status.
 - [ ] **Step 2: Write failing JSON checks.** Cover a minimal valid `info` object (`root_prefix`, `conda_version`, `envs_dirs`), empty `envs` and package arrays, package `name`/`version`, unknown fields, and errors for missing fields, null/wrong types, relative paths, and invalid JSON. The first `dotnet run --project tests/CondaManager.Checks` must fail because `CondaJson` is absent.
 - [ ] **Step 3: Implement only the parsing contract.** Use `JsonDocument`; check property `ValueKind` before reading. Windows paths must be rooted and normalized with `Path.GetFullPath` plus `Path.TrimEndingDirectorySeparator`. Never infer an environment's Python version from `info.python_version`.
-- [ ] **Step 4: Run checks and build.** `dotnet restore CondaManager.slnx --source . -p:NuGetAudit=false`, `dotnet run --project tests/CondaManager.Checks --no-restore`, then `dotnet build CondaManager.slnx --no-restore`. Expected: zero check failures and build errors.
+- [ ] **Step 4: Run checks and build.** Run `pwsh -File scripts/verify.ps1`. It executes offline restore, solution build, and the console checks with one MSBuild node because this sandbox fails during parallel solution builds. Expected: zero check failures and build errors.
 - [ ] **Step 5: Commit** the tested slice with `feat: add Conda JSON contracts`.
 
 ### Task 2: Process runner and launcher verification
@@ -66,7 +67,7 @@
 - [ ] **Step 1: Write failing process and validation checks.** The checks launch the test executable itself in `--echo-args` mode to prove paths with spaces and Chinese stay one argument. A fake `IProcessRunner` drives a failed `Scripts/conda.exe` followed by a successful `<root>/python.exe -m conda`, a root mismatch, malformed JSON, timeout, and user cancellation. Verify that only the matching root is accepted.
 - [ ] **Step 2: Verify failure.** `dotnet run --project tests/CondaManager.Checks --no-restore` must fail at the missing runner and validator contract.
 - [ ] **Step 3: Implement runner and validator.** Set `UseShellExecute=false`, redirect stdout/stderr, set `CreateNoWindow=true`, and fill `ArgumentList` from fixed leading arguments plus command arguments. Read both streams concurrently, wait asynchronously, kill the process tree on timeout or cancellation, and preserve stderr/exit status. Per root, try `Scripts/conda.exe` then its own `python.exe -m conda`; do not invoke `.bat` or `.cmd` with user input.
-- [ ] **Step 4: Run checks and build** with the Task 1 commands. Expected: zero failures/errors.
+- [ ] **Step 4: Run checks and build** with `pwsh -File scripts/verify.ps1`. Expected: zero failures/errors.
 - [ ] **Step 5: Commit** the tested slice with `feat: validate Conda launchers`.
 
 ### Task 3: Candidate discovery and selection
@@ -82,7 +83,7 @@
 - [ ] **Step 1: Write failing discovery checks.** Assert stable order (saved root, `CONDA_EXE`, PATH, conventional roots), case-insensitive/trailing-slash deduplication, same-root launcher deduplication, distinct-root preservation, invalid saved selection fallback, valid saved selection preference, manual root validation, and cancellation.
 - [ ] **Step 2: Verify failure.** Run console checks and confirm missing discovery/selection behavior is the cause.
 - [ ] **Step 3: Implement discovery and settings.** A candidate is only verified after `info --json` returns exit code 0 with required typed fields and a matching normalized root. Persist only the selected installation root to `%LOCALAPPDATA%/CondaManager/settings.json`. If the settings file is missing or invalid, continue scanning; if writing it fails, keep the in-memory selection and report the settings error without crashing.
-- [ ] **Step 4: Run checks and build** with the Task 1 commands. Expected: zero failures/errors.
+- [ ] **Step 4: Run checks and build** with `pwsh -File scripts/verify.ps1`. Expected: zero failures/errors.
 - [ ] **Step 5: Commit** the tested slice with `feat: discover Conda installations`.
 
 ### Task 4: Minimal WPF application and delivery
