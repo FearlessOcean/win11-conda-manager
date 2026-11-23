@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using CondaManager.Core;
 
@@ -35,16 +36,23 @@ public static class ProcessChecks
     [Check("process runner times out a sleeping child")]
     public static async Task TimesOutSleepingChild()
     {
+        var timer = Stopwatch.StartNew();
         await Expect.ThrowsAsync<TimeoutException>(() => new ProcessRunner().RunAsync(
             TestLauncher("--sleep"), ["5000"], TimeSpan.FromMilliseconds(200), CancellationToken.None));
+        Expect.True(timer.Elapsed < TimeSpan.FromSeconds(2),
+            $"Process timeout took {timer.Elapsed}, exceeding the cleanup bound.");
     }
 
     [Check("process runner honors user cancellation")]
     public static async Task HonorsCancellation()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
-        await Expect.ThrowsAsync<OperationCanceledException>(() => new ProcessRunner().RunAsync(
+        var timer = Stopwatch.StartNew();
+        var exception = await Expect.ThrowsAsync<OperationCanceledException>(() => new ProcessRunner().RunAsync(
             TestLauncher("--sleep"), ["5000"], TimeSpan.FromSeconds(10), cancellation.Token));
+        Expect.Equal(cancellation.Token, exception.CancellationToken);
+        Expect.True(timer.Elapsed < TimeSpan.FromSeconds(2),
+            $"Process cancellation took {timer.Elapsed}, exceeding the cleanup bound.");
     }
 
     private static CondaLauncher TestLauncher(string mode)

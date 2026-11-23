@@ -56,19 +56,38 @@ public sealed class ProcessRunner : IProcessRunner
         }
         catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
         {
+            Exception? cleanupFailure = null;
             try
             {
                 if (!process.HasExited)
                     process.Kill(entireProcessTree: true);
             }
-            catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
+            catch (Exception exception) when (exception is InvalidOperationException or Win32Exception or AggregateException)
             {
-                // The process may exit between HasExited and Kill.
+                cleanupFailure = exception;
             }
 
-            await process.WaitForExitAsync(CancellationToken.None);
-            cancellationToken.ThrowIfCancellationRequested();
-            throw new TimeoutException($"Process '{launcher.ExecutablePath}' timed out after {timeout}.");
+            using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            try
+            {
+                await process.WaitForExitAsync(cleanupCancellation.Token);
+            }
+            catch (OperationCanceledException exception) when (cleanupCancellation.IsCancellationRequested)
+            {
+                var waitFailure = new TimeoutException("Process cleanup did not finish within one second.", exception);
+                cleanupFailure = cleanupFailure is null ? waitFailure : new AggregateException(cleanupFailure, waitFailure);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or Win32Exception or AggregateException)
+            {
+                cleanupFailure = cleanupFailure is null ? exception : new AggregateException(cleanupFailure, exception);
+            }
+
+            var cleanupDiagnostic = cleanupFailure is null ? "" : $" Cleanup failed: {cleanupFailure.Message}";
+            if (cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException(
+                    $"Process '{launcher.ExecutablePath}' was canceled.{cleanupDiagnostic}", cleanupFailure, cancellationToken);
+            throw new TimeoutException(
+                $"Process '{launcher.ExecutablePath}' timed out after {timeout}.{cleanupDiagnostic}", cleanupFailure);
         }
 
         return new ProcessResult(process.ExitCode, await stdoutTask, await stderrTask);
