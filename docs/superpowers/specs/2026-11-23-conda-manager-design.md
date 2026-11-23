@@ -31,8 +31,9 @@ and parses the JSON data needed by later environment operations.
 - A WPF presentation layer owns interaction state. A service layer discovers
   installations and coordinates operations. A Conda adapter owns process
   invocation and JSON parsing. Conda remains the source of environment facts;
-  local settings only retain the chosen launcher and any custom prefixes the
-  application creates when Conda does not register them.
+  local settings under `%LOCALAPPDATA%/CondaManager` retain the chosen
+  installation root and any custom prefixes the application creates when
+  Conda does not register them.
 - Every process uses an absolute executable path and a separate argument list.
   No user-supplied text is interpolated into a shell command. Candidate
   launchers are verified with `info --json`; an installation's own
@@ -43,10 +44,16 @@ and parses the JSON data needed by later environment operations.
 
 ## Data flow
 
-1. Discover candidate installation roots from configured selection, process
-   environment, and a bounded set of conventional locations. Validate each
-   candidate by running `conda info --json` asynchronously and checking its
-   exit status, JSON shape, and reported root prefix.
+1. Discover candidate installation roots in a stable order: saved root,
+   `CONDA_EXE`, PATH entries, then a bounded set of conventional locations.
+   Manual selection accepts an installation root directory. Normalize full
+   paths, trim trailing separators, and compare without case to deduplicate.
+   For each root, try `Scripts/conda.exe`, then that root's
+   `python.exe -m conda`. Run `info --json` with a 30-second timeout per
+   launcher. A start failure, timeout, nonzero exit, malformed JSON, or
+   mismatched reported root permits the next launcher from that same root;
+   user cancellation stops the scan. Deduplicate verified installations by
+   normalized `root_prefix`, retaining the first working launcher.
 2. Read `conda info --json` for installation metadata and `envs_dirs`; read
    `conda env list --json` separately for known environment prefixes. This
    avoids depending on `envs_dirs` appearing in the environment-list response.
@@ -63,11 +70,18 @@ and parses the JSON data needed by later environment operations.
   automated tests.
 - A discovery flow that finds candidates, validates actual launchers, deduplicates
   installations by normalized root prefix, and supports manually choosing an
-  installation directory.
+  installation root directory. The UI shows scan progress, a distinct
+  no-results state, and per-candidate failures. The user can switch among
+  verified installations. A saved root is selected when still valid; an
+  invalid saved root is ignored and the first verified installation is selected.
 - Typed parsing for Conda installation information, environment paths, and
-  package records. Unknown JSON fields are tolerated. Missing required fields,
-  malformed JSON, failed starts, nonzero exit codes, and timeouts are surfaced
-  as distinct errors without crashing the UI.
+  package records. `info` requires absolute `root_prefix`, nonempty
+  `conda_version`, and an `envs_dirs` array of absolute paths; `env list`
+  requires an `envs` array of absolute paths; each `list` package requires
+  nonempty `name` and `version`. Empty arrays and unknown fields are accepted.
+  Missing fields, wrong types, null or relative paths, malformed JSON, failed
+  starts, nonzero exit codes, and timeouts are surfaced as distinct errors
+  without crashing the UI.
 - A minimal Chinese UI showing discovery progress and verified installations,
   the chosen installation's root path/version/default environment directories,
   plus an error or manual-selection state. Environment management controls
@@ -81,8 +95,11 @@ and parses the JSON data needed by later environment operations.
   installation is marked unusable.
 - Process results include exit code, stdout, and stderr. JSON parse failures
   report context but do not expose unrelated installation configuration.
+- A `.gitignore` excludes .NET build output and local tool caches. The design
+  and each completed implementation slice are committed to Git.
 - Tests use fixed JSON fixtures and fake process results for discovery, parsing,
-  fallback, deduplication, malformed output, and paths containing spaces or
-  Chinese characters. A read-only real Conda smoke test validates discovery
-  when a usable installation is available.
+  fallback, deduplication, malformed output, timeout/cancellation, invalid
+  saved selection, and paths containing spaces or Chinese characters.
+  A read-only real Conda smoke test can be run manually against a usable
+  installation; it is optional for CI.
 - The first phase does not create or remove real Conda environments.
