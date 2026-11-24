@@ -236,6 +236,14 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Row="2" Margin="0,0,0,12">
+                        <WrapPanel Margin="0,0,0,10">
+                            <Button Content="安装软件包" Padding="12,6" Margin="0,0,8,0"
+                                    IsEnabled="{Binding CanInstallPackage}" Click="InstallPackage_Click" />
+                            <Button Content="更新选中项" Padding="12,6" Margin="0,0,8,0"
+                                    IsEnabled="{Binding CanChangeSelectedPackage}" Click="UpdatePackage_Click" />
+                            <Button Content="卸载选中项" Padding="12,6"
+                                    IsEnabled="{Binding CanChangeSelectedPackage}" Click="RemovePackage_Click" />
+                        </WrapPanel>
                         <TextBlock Text="搜索软件包（名称或版本）" Style="{StaticResource MutedText}" Margin="0,0,0,5" />
                         <TextBox Text="{Binding Browser.PackageSearchText, UpdateSourceTrigger=PropertyChanged}"
                                  Padding="9,7" MinHeight="34" IsEnabled="{Binding CanInteract}" />
@@ -256,6 +264,9 @@
                                    Visibility="{Binding Browser.HasFilteredNoResults, Converter={StaticResource BooleanToVisibility}}" />
                     </StackPanel>
                     <DataGrid Grid.Row="4" ItemsSource="{Binding Browser.VisiblePackages}"
+                              x:Name="PackageGrid" IsEnabled="{Binding CanInteract}"
+                              SelectionMode="Single" SelectionUnit="FullRow"
+                              SelectionChanged="PackageSelection_Changed"
                               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                               BorderBrush="#DDE2E8" AlternatingRowBackground="#F7F8FA">
@@ -264,6 +275,27 @@
                             <DataGridTextColumn Header="版本" Binding="{Binding Version}" Width="*" />
                             <DataGridTextColumn Header="构建" Binding="{Binding Build}" Width="*" />
                             <DataGridTextColumn Header="渠道" Binding="{Binding Channel}" Width="*" />
+                            <DataGridTemplateColumn Header="软件包来源" Width="SizeToHeader">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="4,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="未知（只读）" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Origin}" Value="Conda">
+                                                            <Setter Property="Text" Value="Conda" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Origin}" Value="Pip">
+                                                            <Setter Property="Text" Value="pip（只读）" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

@@ -36,6 +36,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged(nameof(CanInteract));
             OnPropertyChanged(nameof(CanCreate));
             OnPropertyChanged(nameof(CanDelete));
+            NotifyPackageActionsChanged();
         }
     }
 
@@ -110,6 +111,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var settings = new SelectionSettings();
         _managedPrefixes = new ManagedPrefixStore();
         _operator = new CondaEnvironmentOperator(runner);
+        _packageOperator = new CondaPackageOperator(runner);
         var discovery = new CondaDiscoveryService(new CondaLauncherValidator(runner));
         Discovery = new MainViewModel(discovery, settings, savedRoot =>
             CondaCandidateFinder.FindRoots(
@@ -169,6 +171,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             OnPropertyChanged(nameof(CanCreate));
             OnPropertyChanged(nameof(CanDelete));
+            NotifyPackageActionsChanged();
         }
         if (e.PropertyName == nameof(MainViewModel.SelectedInstallation))
             await RunBrowserAsync(token => Browser.SetInstallationAsync(Discovery.SelectedInstallation, token));
@@ -178,6 +181,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         if (e.PropertyName == nameof(EnvironmentBrowserViewModel.SelectedEnvironment))
             OnPropertyChanged(nameof(CanDelete));
+        if (e.PropertyName is nameof(EnvironmentBrowserViewModel.SelectedEnvironment) or
+            nameof(EnvironmentBrowserViewModel.EnvironmentState) or nameof(EnvironmentBrowserViewModel.PackageState))
+            NotifyPackageActionsChanged();
     }
 
     private async void Environment_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -403,13 +409,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         exception.Message.Contains("Cleanup failed:", StringComparison.OrdinalIgnoreCase);
 
     private static string UncertainCleanupMessage(string prefix) =>
-        $"无法确认 Conda 进程已经退出。请勿立即创建或删除环境；先在任务管理器确认进程结束，检查目标目录，然后重启应用：{prefix}";
+        $"无法确认 Conda 进程已经退出。请在任务管理器确认进程结束，检查目标目录，然后重启应用：{prefix}";
 
     private void RequireOperationInspection()
     {
         _operationNeedsInspection = true;
         OnPropertyChanged(nameof(CanCreate));
         OnPropertyChanged(nameof(CanDelete));
+        NotifyPackageActionsChanged();
     }
 
     private static bool IsSameOrAncestor(string candidate, string protectedRoot)
