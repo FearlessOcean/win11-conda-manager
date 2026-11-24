@@ -139,6 +139,27 @@ public static class SelectionChecks
             "Settings write failure should be shown without losing the selection.");
     }
 
+    [Check("rescan preserves current installation when settings cannot be saved")]
+    public static async Task RescanPreservesCurrentInstallation()
+    {
+        using var tree = new DiscoveryChecks.DiscoveryTree();
+        var first = tree.CreateRoot("first-rescan");
+        var second = tree.CreateRoot("second-rescan");
+        tree.Touch(Path.Combine(first, "Scripts", "conda.exe"));
+        tree.Touch(Path.Combine(second, "Scripts", "conda.exe"));
+        var runner = new DiscoveryChecks.DiscoveryRunner();
+        runner.Return(first, DiscoveryChecks.ValidInfo(first));
+        runner.Return(second, DiscoveryChecks.ValidInfo(second));
+        var settingsPath = tree.CreateDirectory("unwritable-settings");
+        var viewModel = NewViewModel(runner, new SelectionSettings(settingsPath), _ => [first]);
+
+        await viewModel.ScanAsync();
+        await viewModel.AddManualRootAsync(second);
+        await viewModel.ScanAsync();
+
+        Expect.Equal(second, viewModel.SelectedInstallation!.Info.RootPrefix);
+    }
+
     [Check("view model cancellation resets scanning state and visits no later roots")]
     public static async Task ScanCancellation()
     {

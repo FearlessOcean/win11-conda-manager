@@ -78,6 +78,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (IsScanning)
             return;
 
+        var currentRoot = SelectedInstallation?.Info.RootPrefix;
         IsScanning = true;
         HasNoResults = false;
         StatusMessage = "正在查找 Conda 安装…";
@@ -90,7 +91,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             var savedRoot = await Task.Run(_settings.Load, cancellationToken).WaitAsync(cancellationToken);
             var roots = await Task.Run(() => _rootsProvider(savedRoot), cancellationToken)
                 .WaitAsync(cancellationToken);
-            var result = await _discovery.DiscoverAsync(roots,
+            var scanRoots = currentRoot is null
+                ? roots
+                : new[] { currentRoot }.Concat(roots).ToArray();
+            var result = await _discovery.DiscoverAsync(scanRoots,
                 new InlineProgress<CondaDiscoveryProgress>(UpdateProgress), cancellationToken);
             foreach (var installation in result.Installations)
                 Installations.Add(installation);
@@ -98,7 +102,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Diagnostics.Add(failure);
 
             SelectedInstallation = Installations.FirstOrDefault(installation =>
-                string.Equals(installation.Info.RootPrefix, savedRoot, StringComparison.OrdinalIgnoreCase))
+                string.Equals(installation.Info.RootPrefix, currentRoot, StringComparison.OrdinalIgnoreCase))
+                ?? Installations.FirstOrDefault(installation =>
+                    string.Equals(installation.Info.RootPrefix, savedRoot, StringComparison.OrdinalIgnoreCase))
                 ?? Installations.FirstOrDefault();
             HasNoResults = Installations.Count == 0;
             StatusMessage = HasNoResults
