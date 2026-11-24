@@ -16,9 +16,13 @@ public sealed class CondaEnvironmentCatalog : ICondaEnvironmentCatalog
     private static readonly TimeSpan EnvironmentListTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan PackageListTimeout = TimeSpan.FromMinutes(2);
     private readonly IProcessRunner _runner;
+    private readonly IManagedPrefixStore? _managedPrefixes;
 
-    public CondaEnvironmentCatalog(IProcessRunner runner) =>
+    public CondaEnvironmentCatalog(IProcessRunner runner, IManagedPrefixStore? managedPrefixes = null)
+    {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _managedPrefixes = managedPrefixes;
+    }
 
     public async Task<IReadOnlyList<CondaEnvironment>> ListEnvironmentsAsync(
         VerifiedInstallation installation, CancellationToken cancellationToken)
@@ -42,6 +46,17 @@ public sealed class CondaEnvironmentCatalog : ICondaEnvironmentCatalog
 
         if (seen.Add(root))
             environments.Insert(0, ToEnvironment(root, root));
+
+        if (_managedPrefixes is not null)
+        {
+            foreach (var prefix in _managedPrefixes.Load())
+            {
+                if (Path.IsPathFullyQualified(prefix) &&
+                    File.Exists(Path.Combine(prefix, "conda-meta", "history")) &&
+                    seen.Add(prefix))
+                    environments.Add(ToEnvironment(prefix, root));
+            }
+        }
 
         return environments;
     }

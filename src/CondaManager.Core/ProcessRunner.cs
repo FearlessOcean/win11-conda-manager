@@ -3,7 +3,11 @@ using System.Diagnostics;
 
 namespace CondaManager.Core;
 
-public sealed record CondaLauncher(string ExecutablePath, IReadOnlyList<string> LeadingArguments);
+public sealed record CondaLauncher(string ExecutablePath, IReadOnlyList<string> LeadingArguments)
+{
+    public IReadOnlyDictionary<string, string> EnvironmentOverrides { get; init; } =
+        new Dictionary<string, string>();
+}
 
 public sealed record ProcessResult(int ExitCode, string Stdout, string Stderr);
 
@@ -21,6 +25,7 @@ public sealed class ProcessRunner : IProcessRunner
         ArgumentNullException.ThrowIfNull(launcher);
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(launcher.LeadingArguments);
+        ArgumentNullException.ThrowIfNull(launcher.EnvironmentOverrides);
         if (timeout <= TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
             throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive or infinite.");
 
@@ -37,6 +42,8 @@ public sealed class ProcessRunner : IProcessRunner
             startInfo.ArgumentList.Add(argument);
         foreach (var argument in arguments)
             startInfo.ArgumentList.Add(argument);
+        foreach (var (name, value) in launcher.EnvironmentOverrides)
+            startInfo.Environment[name] = value;
 
         using var process = new Process { StartInfo = startInfo };
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

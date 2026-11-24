@@ -6,6 +6,24 @@ namespace CondaManager.Checks;
 
 public static class ProcessChecks
 {
+    [Check("process runner applies launcher environment overrides only to the child")]
+    public static async Task LauncherEnvironmentOverrides()
+    {
+        var variable = $"CONDA_MANAGER_CHECK_{Guid.NewGuid():N}";
+        var launcher = TestLauncher("--echo-env") with
+        {
+            EnvironmentOverrides = new Dictionary<string, string> { [variable] = "child-only" }
+        };
+
+        var result = await new ProcessRunner().RunAsync(launcher,
+            [variable], TimeSpan.FromSeconds(10), CancellationToken.None);
+
+        Expect.Equal(0, result.ExitCode);
+        Expect.Equal("child-only", result.Stdout);
+        Expect.True(Environment.GetEnvironmentVariable(variable) is null,
+            "The parent process environment must remain unchanged.");
+    }
+
     [Check("process runner preserves separate arguments, including spaces and Chinese")]
     public static async Task PreservesArguments()
     {

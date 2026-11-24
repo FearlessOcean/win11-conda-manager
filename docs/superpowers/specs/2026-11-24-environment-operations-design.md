@@ -32,8 +32,13 @@ Only a selected, non-base Conda environment can be deleted. The confirmation
 shows the full prefix and states that **every file in that directory** will be
 removed. The service independently rejects drive/share roots, the selected
 base, every known installation root and any ancestor of one, the active
-`CONDA_PREFIX`, and paths without `conda-meta/history`. It invokes
+`CONDA_PREFIX` and its ancestors, and paths without `conda-meta/history`. It invokes
 `conda env remove --prefix <prefix> --yes --json` through the verified launcher.
+Before invocation, the service also compares Windows directory identities for
+the target and protected directories, including their ancestors. This catches
+alternate drive mappings and other path spellings that string comparison can
+miss. If an identity cannot be read, deletion is refused. The target path and
+its ancestors must not be reparse points.
 Successful deletion must leave the target absent; otherwise the UI reports an
 uncertain result for inspection. Process exit codes determine command failure;
 successful creation also requires a valid Conda environment marker at the
@@ -48,7 +53,9 @@ selection, scans, refresh, and another mutation are disabled. The user can
 request cancellation; the UI waits for the Conda child to stop and then
 refreshes. Window close is blocked while an operation is still running. An
 operation failure or cancellation may leave a partial directory, so the UI
-shows the exact path and refreshes the environment list in every outcome.
+shows the exact path and normally refreshes the environment list. If child
+cleanup fails, the UI skips refresh and blocks further mutations until restart,
+with a clear process and directory inspection message.
 
 After successful creation, the application stores the normalized prefix in a
 small local JSON file and merges still-existing stored Conda environments into
@@ -63,6 +70,9 @@ Conda operation result.
 - Core services own validation, path normalization, process arguments, JSON
   result checks, timeouts, root protection, and prefix persistence. WPF owns
   dialogs and confirmation only.
+- Windows device-path aliases and paths with 8.3 short-name style segments are
+  rejected for mutation. For existing directories, Windows volume and file
+  index are also checked before deletion; an inconclusive comparison blocks it.
 - Create and delete use the same `IProcessRunner` abstraction as discovery.
   User text is never assembled into a command-line string.
 - Conda child processes launched by this application receive
@@ -71,7 +81,7 @@ Conda operation result.
 - Checks use fake process results and disposable paths inside the repository.
   They cover default choice, preview/argument equality, existing-target
   rejection, base/root/ancestor/active-path protection, non-Conda folders,
-  success and failure JSON, cancellation, and post-operation state. They never
-  create or delete a real user Conda environment.
+  success and failure JSON, directory identity, cancellation, and
+  post-operation state. They never create or delete a real user Conda environment.
 - The full solution build, checks, WPF smoke test, and self-contained Windows
   publish must pass.

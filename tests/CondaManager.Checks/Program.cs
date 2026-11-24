@@ -13,6 +13,11 @@ public static class Program
             Console.Write(JsonSerializer.Serialize(args.Skip(1)));
             return 0;
         }
+        if (args.Length == 2 && args[0] == "--echo-env")
+        {
+            Console.Write(Environment.GetEnvironmentVariable(args[1]) ?? "");
+            return 0;
+        }
         if (args.Length == 2 && args[0] == "--sleep")
         {
             await Task.Delay(int.Parse(args[1]));

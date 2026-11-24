@@ -51,6 +51,32 @@ public static class CatalogChecks
         Expect.Equal(custom, environments[1].Prefix);
     }
 
+    [Check("environment catalog merges valid remembered prefixes without duplicates")]
+    public static async Task MergesRememberedPrefixes()
+    {
+        using var tree = new DiscoveryChecks.DiscoveryTree();
+        var registered = tree.CreateDirectory("registered-env");
+        var custom = tree.CreateDirectory("custom-env");
+        var stale = Path.Combine(tree.Base, "deleted-env");
+        tree.Touch(Path.Combine(registered, "conda-meta", "history"));
+        tree.Touch(Path.Combine(custom, "conda-meta", "history"));
+        var installation = Installation();
+        var runner = new FakeRunner(new ProcessResult(0,
+            JsonSerializer.Serialize(new { envs = new[] { registered } }), ""));
+        var remembered = new FakePrefixStore([registered, custom, stale]);
+
+        var environments = await new CondaEnvironmentCatalog(runner, remembered)
+            .ListEnvironmentsAsync(installation, CancellationToken.None);
+
+        Expect.Equal(3, environments.Count);
+        Expect.Equal(1, environments.Count(item =>
+            string.Equals(item.Prefix, registered, StringComparison.OrdinalIgnoreCase)));
+        Expect.True(environments.Any(item => item.Prefix == custom),
+            "An app-created custom prefix must remain discoverable when Conda omits it.");
+        Expect.True(environments.All(item => item.Prefix != stale),
+            "A removed prefix without a Conda history marker must not reappear.");
+    }
+
     [Check("environment catalog lists packages for a custom absolute prefix")]
     public static async Task ListsSelectedPrefixPackages()
     {
@@ -145,5 +171,12 @@ public static class CatalogChecks
             OnRun?.Invoke();
             return Task.FromResult(_responses.Dequeue());
         }
+    }
+
+    private sealed class FakePrefixStore(IReadOnlyList<string> prefixes) : IManagedPrefixStore
+    {
+        public IReadOnlyList<string> Load() => prefixes;
+        public void Add(string prefix) => throw new NotSupportedException();
+        public void Remove(string prefix) => throw new NotSupportedException();
     }
 }

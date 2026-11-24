@@ -118,6 +118,13 @@ public sealed class EnvironmentBrowserViewModel : INotifyPropertyChanged, IDispo
             SelectedEnvironment?.Prefix ?? _preferredPrefix, cancellationToken);
     }
 
+    public Task RefreshAsync(string preferredPrefix, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(preferredPrefix);
+        return LoadEnvironmentsAsync(_installation, preferredPrefix, cancellationToken);
+    }
+
     public Task SelectEnvironmentAsync(CondaEnvironment? environment,
         CancellationToken cancellationToken = default)
     {

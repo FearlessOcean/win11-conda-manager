@@ -140,6 +140,32 @@ public static class BrowserChecks
         Expect.Equal(other, browser.SelectedEnvironment!.Prefix);
     }
 
+    [Check("refresh can select a newly created prefix without loading base packages first")]
+    public static async Task RefreshSelectsRequestedPrefix()
+    {
+        var root = Root("create-refresh");
+        var created = Root("create-refresh", "envs", "new-env");
+        var includeCreated = false;
+        var catalog = new FakeCatalog
+        {
+            Environments = (_, _) => Task.FromResult<IReadOnlyList<CondaEnvironment>>(
+                includeCreated
+                    ? [Environment(root, true), Environment(created)]
+                    : [Environment(root, true)]),
+            Packages = (_, _, _) => Task.FromResult<IReadOnlyList<CondaPackage>>([])
+        };
+        using var browser = new EnvironmentBrowserViewModel(catalog);
+        await browser.SetInstallationAsync(Installation(root));
+        catalog.PackageCalls.Clear();
+        includeCreated = true;
+
+        await browser.RefreshAsync(created);
+
+        Expect.Equal(created, browser.SelectedEnvironment!.Prefix);
+        Expect.Equal(1, catalog.PackageCalls.Count);
+        Expect.Equal(created, catalog.PackageCalls[0]);
+    }
+
     [Check("package search matches name and version without case sensitivity")]
     public static async Task PackageSearch()
     {

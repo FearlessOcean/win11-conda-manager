@@ -80,6 +80,36 @@
             <TextBlock Text="Conda 环境管理器" FontSize="26" FontWeight="SemiBold" />
             <TextBlock Text="浏览本机 Conda、Miniconda 和 Miniforge 的虚拟环境与软件包"
                        Foreground="#566270" Margin="0,5,0,0" />
+            <Border Margin="0,12,0,0" Padding="12" Background="#EAF2FC" BorderBrush="#BCD2EE"
+                    BorderThickness="1" CornerRadius="6"
+                    Visibility="{Binding HasOperationMessage, Converter={StaticResource BooleanToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OperationStatusMessage}" TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#254E79" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOperationError}" Value="True">
+                                            <Setter Property="Foreground" Value="#A33C35" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <ProgressBar Height="4" IsIndeterminate="True" Margin="0,8,12,0"
+                                     Visibility="{Binding IsOperating, Converter={StaticResource BooleanToVisibility}}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="取消操作" Padding="12,6" Margin="12,0,0,0"
+                            VerticalAlignment="Center" IsEnabled="{Binding CanCancelOperation}"
+                            Visibility="{Binding IsOperating, Converter={StaticResource BooleanToVisibility}}"
+                            Click="CancelOperation_Click" />
+                </Grid>
+            </Border>
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="0,0,0,16">
@@ -90,6 +120,7 @@
             </Grid.ColumnDefinitions>
             <ComboBox Grid.Column="0" ItemsSource="{Binding Discovery.Installations}"
                       SelectedItem="{Binding Discovery.SelectedInstallation, Mode=TwoWay}"
+                      IsEnabled="{Binding CanInteract}"
                       MinHeight="36" Padding="8,4" VerticalContentAlignment="Center"
                       ToolTip="当前使用的 Conda 安装">
                 <ComboBox.ItemTemplate>
@@ -109,12 +140,15 @@
                             <DataTrigger Binding="{Binding Discovery.IsScanning}" Value="True">
                                 <Setter Property="IsEnabled" Value="False" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding IsOperating}" Value="True">
+                                <Setter Property="IsEnabled" Value="False" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
             </Button>
             <Button Grid.Column="2" Content="选择安装目录" Style="{StaticResource ActionButton}"
-                    Click="Browse_Click" />
+                    IsEnabled="{Binding CanInteract}" Click="Browse_Click" />
         </Grid>
 
         <Grid Grid.Row="2">
@@ -131,9 +165,13 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="虚拟环境" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Content="刷新" Padding="10,5" Click="EnvironmentRefresh_Click" />
+                        <Button Grid.Column="1" Content="新建" Padding="10,5" Margin="0,0,6,0"
+                                IsEnabled="{Binding CanCreate}" Click="Create_Click" />
+                        <Button Grid.Column="2" Content="刷新" Padding="10,5"
+                                IsEnabled="{Binding CanCreate}" Click="EnvironmentRefresh_Click" />
                     </Grid>
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Text="正在读取环境列表…" Style="{StaticResource EnvironmentLoading}"
@@ -145,12 +183,13 @@
                             <TextBlock Text="{Binding Browser.EnvironmentError}" TextWrapping="Wrap"
                                        Foreground="#A33C35" Margin="0,3,0,6" />
                             <Button Content="重试" HorizontalAlignment="Left" Padding="10,5"
-                                    Click="EnvironmentRefresh_Click" />
+                                    IsEnabled="{Binding CanInteract}" Click="EnvironmentRefresh_Click" />
                         </StackPanel>
                     </StackPanel>
                     <ListBox ItemsSource="{Binding Browser.Environments}"
                              SelectedItem="{Binding Browser.SelectedEnvironment, Mode=OneWay}"
                              SelectionChanged="Environment_SelectionChanged"
+                             IsEnabled="{Binding CanInteract}"
                              BorderThickness="0" Background="Transparent"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemTemplate>
@@ -176,8 +215,15 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="环境详情" Style="{StaticResource SectionTitle}"
-                               Margin="0,0,0,12" />
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="环境详情" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="删除环境" Padding="12,6"
+                                IsEnabled="{Binding CanDelete}" Click="Delete_Click" />
+                    </Grid>
                     <StackPanel Grid.Row="1" Margin="0,0,0,14">
                         <TextBlock Text="存放位置" Style="{StaticResource MutedText}" />
                         <TextBlock Text="{Binding Browser.SelectedEnvironment.Prefix, TargetNullValue=请选择环境, FallbackValue=请选择环境}"
@@ -192,7 +238,7 @@
                     <StackPanel Grid.Row="2" Margin="0,0,0,12">
                         <TextBlock Text="搜索软件包（名称或版本）" Style="{StaticResource MutedText}" Margin="0,0,0,5" />
                         <TextBox Text="{Binding Browser.PackageSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 Padding="9,7" MinHeight="34" />
+                                 Padding="9,7" MinHeight="34" IsEnabled="{Binding CanInteract}" />
                     </StackPanel>
                     <StackPanel Grid.Row="3" Margin="0,0,0,8">
                         <TextBlock Text="正在读取软件包…" Style="{StaticResource PackageLoading}"
@@ -204,7 +250,7 @@
                             <TextBlock Text="{Binding Browser.PackageError}" TextWrapping="Wrap"
                                        Foreground="#A33C35" Margin="0,3,0,6" />
                             <Button Content="重试" HorizontalAlignment="Left" Padding="10,5"
-                                    Click="PackageRefresh_Click" />
+                                    IsEnabled="{Binding CanInteract}" Click="PackageRefresh_Click" />
                         </StackPanel>
                         <TextBlock Text="没有匹配的软件包。" Foreground="#647284"
                                    Visibility="{Binding Browser.HasFilteredNoResults, Converter={StaticResource BooleanToVisibility}}" />
