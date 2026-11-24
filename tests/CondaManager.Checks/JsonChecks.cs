@@ -118,7 +118,9 @@ public static class JsonChecks
             """[{"name":"python","version":7}]""",
             """[{"name":"python","version":""}]""",
             """[{"name":"python","version":"1","build_string":2}]""",
-            """[{"name":"python","version":"1","channel":{}}]""");
+            """[{"name":"python","version":"1","channel":{}}]""",
+            """[{"name":"python","version":"1","channel":null}]""",
+            """[{"name":"python","version":"1","package_type":2}]""");
     }
 
     [Check("all parsers report malformed JSON and wrong top-level shapes as data errors")]

@@ -35,7 +35,10 @@ public static class CondaJson
                 RequiredString(item, "name"),
                 RequiredString(item, "version"),
                 OptionalString(item, "build_string"),
-                OptionalString(item, "channel")));
+                OptionalString(item, "channel"))
+            {
+                PackageType = OptionalString(item, "package_type", allowNull: true)
+            });
         }
 
         return packages;
@@ -90,9 +93,11 @@ public static class CondaJson
         return value;
     }
 
-    private static string? OptionalString(JsonElement parent, string propertyName)
+    private static string? OptionalString(JsonElement parent, string propertyName, bool allowNull = false)
     {
         if (!parent.TryGetProperty(propertyName, out var property))
+            return null;
+        if (allowNull && property.ValueKind == JsonValueKind.Null)
             return null;
         if (property.ValueKind != JsonValueKind.String)
             throw new CondaDataException($"Field '{propertyName}' must be a string.");
