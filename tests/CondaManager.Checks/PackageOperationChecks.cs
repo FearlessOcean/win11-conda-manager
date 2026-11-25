@@ -10,10 +10,35 @@ public static class PackageOperationChecks
     {
         Expect.Equal("numpy", CondaPackageOperator.BuildInstallSpec("numpy", null));
         Expect.Equal("numpy=1.26.4", CondaPackageOperator.BuildInstallSpec("numpy", "1.26.4"));
+        Expect.Equal("_libgcc_mutex==0.1", CondaPackageOperator.BuildInstallSpec("_libgcc_mutex", "0.1", true));
+        Expect.Equal("pytorch==1.2+cpu", CondaPackageOperator.BuildInstallSpec("pytorch", "1.2+cpu", true));
+        Expect.Equal("python==1!3.12", CondaPackageOperator.BuildInstallSpec("python", "1!3.12", true));
+        Expect.Throws<ArgumentException>(() => CondaPackageOperator.BuildInstallSpec("numpy", null, true));
         foreach (var name in new[] { "", "-bad", "conda-forge::numpy", "numpy scipy", "../numpy", "numpy\n" })
             Expect.Throws<ArgumentException>(() => CondaPackageOperator.BuildInstallSpec(name, null));
         foreach (var version in new[] { ">=1.2", "1.2 3", "1.2::x", "../1.2", " ", " 1.26.4 ", "1.2\n" })
             Expect.Throws<ArgumentException>(() => CondaPackageOperator.BuildInstallSpec("numpy", version));
+    }
+
+    [Check("selected search result retains exact version through preview and apply")]
+    public static async Task ExactSelectedVersionTransaction()
+    {
+        using var tree = new DiscoveryChecks.DiscoveryTree();
+        var request = Request(tree, PackageAction.Install, "_libgcc_mutex", "0.1") with
+        {
+            ExactVersion = true
+        };
+        var runner = new FakeRunner((_, arguments, _) => Task.FromResult(new ProcessResult(0,
+            arguments.Contains("--dry-run")
+                ? "{\"success\":true,\"actions\":{\"LINK\":[{\"name\":\"_libgcc_mutex\",\"version\":\"0.1\"}]}}"
+                : "{\"success\":true}", "")));
+        var service = new CondaPackageOperator(runner);
+
+        var preview = await service.PreviewAsync(request, CancellationToken.None);
+        await service.ApplyAsync(request, preview, CancellationToken.None);
+
+        Expect.Equal("_libgcc_mutex==0.1", runner.Calls[0].Arguments[3]);
+        Expect.Equal("_libgcc_mutex==0.1", runner.Calls[1].Arguments[3]);
     }
 
     [Check("package dry run uses exact install arguments and parses dependency transaction")]
@@ -238,6 +263,45 @@ public static class PackageOperationChecks
         await Expect.ThrowsAsync<CondaOperationException>(() =>
             service.ApplyAsync(request, preview, CancellationToken.None));
         Expect.Equal(2, runner.Calls.Count);
+    }
+
+    [Check("custom app channels are immutable and identical in package preview and apply")]
+    public static async Task AppChannelsStayStableAcrossTransaction()
+    {
+        using var tree = new DiscoveryChecks.DiscoveryTree();
+        var mutableChannels = new List<string> { "conda-forge", "defaults" };
+        var channels = ChannelSnapshot.Custom(mutableChannels);
+        mutableChannels[0] = "untrusted-later-change";
+        var runner = new FakeRunner((_, arguments, _) => Task.FromResult(new ProcessResult(0,
+            arguments.Contains("--dry-run")
+                ? "{\"success\":true,\"actions\":{\"LINK\":[{\"name\":\"numpy\",\"version\":\"1.0\"}]}}"
+                : "{\"success\":true}", "")));
+        var service = new CondaPackageOperator(runner);
+
+        foreach (var action in new[] { PackageAction.Install, PackageAction.Update, PackageAction.Remove })
+        {
+            var installed = action == PackageAction.Install ? null :
+                new CondaPackage("numpy", "1.0", "py312_0", "conda-forge");
+            var request = Request(tree, action, "numpy", null, installed) with { Channels = channels };
+            var preview = await service.PreviewAsync(request, CancellationToken.None);
+            await service.ApplyAsync(request, preview, CancellationToken.None);
+
+            var verb = action switch
+            {
+                PackageAction.Install => "install",
+                PackageAction.Update => "update",
+                _ => "remove"
+            };
+            var flags = new[] { "-c", "conda-forge", "-c", "defaults", "--override-channels" };
+            Expect.True(runner.Calls[^2].Arguments.SequenceEqual(new[]
+            {
+                verb, "--prefix", request.Prefix, "numpy", "--dry-run", "--json"
+            }.Concat(flags)), "Preview must use the captured ordered channels.");
+            Expect.True(runner.Calls[^1].Arguments.SequenceEqual(new[]
+            {
+                verb, "--prefix", request.Prefix, "numpy", "--yes", "--json"
+            }.Concat(flags)), "Apply must use the same captured ordered channels.");
+        }
     }
 
     [Check("package apply rejects fabricated or modified preview objects")]

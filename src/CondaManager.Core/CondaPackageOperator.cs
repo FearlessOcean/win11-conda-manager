@@ -18,7 +18,11 @@ public sealed record PackageOperationRequest(
     string PackageName,
     string? Version,
     CondaPackage? InstalledPackage,
-    IReadOnlyCollection<string> ProtectedRoots);
+    IReadOnlyCollection<string> ProtectedRoots)
+{
+    public ChannelSnapshot Channels { get; init; } = ChannelSnapshot.Inherit;
+    public bool ExactVersion { get; init; }
+}
 
 public sealed record PackageChange(string Name, string Version, string? Build);
 
@@ -42,11 +46,11 @@ public sealed class CondaPackageOperator(IProcessRunner runner) : ICondaPackageO
     private readonly ConditionalWeakTable<PackagePreview, object> _issuedPreviews = new();
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ApplyTimeout = TimeSpan.FromMinutes(45);
-    private static readonly Regex PackageNamePattern = new(@"\A[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\z",
-        RegexOptions.CultureInvariant);
     private static readonly Regex ActionPackageNamePattern = new(@"\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z",
         RegexOptions.CultureInvariant);
-    private static readonly Regex VersionPattern = new(@"\A[0-9][A-Za-z0-9._-]{0,63}\z",
+    private static readonly Regex VersionPattern = new(@"\A[0-9][A-Za-z0-9._+!~-]{0,127}\z",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex ExactVersionPattern = new(@"\A[A-Za-z0-9_][A-Za-z0-9._+!~-]{0,127}\z",
         RegexOptions.CultureInvariant);
     private static readonly Regex ChangeVersionPattern = new(@"\A[A-Za-z0-9][A-Za-z0-9._+!~-]{0,127}\z",
         RegexOptions.CultureInvariant);
@@ -55,14 +59,24 @@ public sealed class CondaPackageOperator(IProcessRunner runner) : ICondaPackageO
     private static readonly Regex ErrorClassPattern = new(@"\A[A-Za-z][A-Za-z0-9_]*(?:Error|Exception)\b",
         RegexOptions.CultureInvariant);
 
-    public static string BuildInstallSpec(string name, string? version)
+    public static string BuildInstallSpec(string name, string? version, bool exactVersion = false)
     {
-        if (string.IsNullOrWhiteSpace(name) || !PackageNamePattern.IsMatch(name))
-            throw new ArgumentException("软件包名称须以字母或数字开头，只包含字母、数字、下划线、点或连字符，且不超过 64 个字符。", nameof(name));
+        if (string.IsNullOrWhiteSpace(name) || !ActionPackageNamePattern.IsMatch(name))
+            throw new ArgumentException("软件包名称须以字母、数字或下划线开头，只包含字母、数字、下划线、点或连字符，且不超过 128 个字符。", nameof(name));
 
         if (version is null or "")
+        {
+            if (exactVersion)
+                throw new ArgumentException("精确安装必须指定版本。", nameof(version));
             return name;
+        }
 
+        if (exactVersion)
+        {
+            if (!ExactVersionPattern.IsMatch(version))
+                throw new ArgumentException("所选软件包版本包含不支持的字符。", nameof(version));
+            return $"{name}=={version}";
+        }
         if (!VersionPattern.IsMatch(version))
             throw new ArgumentException("版本应为简单的 Conda 版本前缀，例如 1.26 或 3.12.2。", nameof(version));
         return $"{name}={version}";
@@ -111,8 +125,11 @@ public sealed class CondaPackageOperator(IProcessRunner runner) : ICondaPackageO
     {
         ArgumentNullException.ThrowIfNull(request.Installation);
         ArgumentNullException.ThrowIfNull(request.ProtectedRoots);
+        ArgumentNullException.ThrowIfNull(request.Channels);
         if (request.Action is not (PackageAction.Install or PackageAction.Update or PackageAction.Remove))
             throw new CondaOperationException("不支持的软件包操作。");
+        if (request.ExactVersion && request.Action != PackageAction.Install)
+            throw new CondaOperationException("只有安装操作可以指定精确版本。");
 
         try
         {
@@ -160,7 +177,8 @@ public sealed class CondaPackageOperator(IProcessRunner runner) : ICondaPackageO
         return target;
     }
 
-    private static string[] BuildArguments(PackageOperationRequest request, string prefix, bool preview)
+    private static IReadOnlyList<string> BuildArguments(PackageOperationRequest request, string prefix,
+        bool preview)
     {
         var verb = request.Action switch
         {
@@ -170,13 +188,18 @@ public sealed class CondaPackageOperator(IProcessRunner runner) : ICondaPackageO
             _ => throw new CondaOperationException("不支持的软件包操作。")
         };
         var spec = BuildPackageSpec(request);
-        return [verb, "--prefix", prefix, spec, preview ? "--dry-run" : "--yes", "--json"];
+        var arguments = new List<string>
+        {
+            verb, "--prefix", prefix, spec, preview ? "--dry-run" : "--yes", "--json"
+        };
+        request.Channels.AppendArguments(arguments);
+        return arguments;
     }
 
     private static string BuildPackageSpec(PackageOperationRequest request)
     {
         if (request.Action == PackageAction.Install)
-            return BuildInstallSpec(request.PackageName, request.Version);
+            return BuildInstallSpec(request.PackageName, request.Version, request.ExactVersion);
         if (string.IsNullOrWhiteSpace(request.PackageName) ||
             !ActionPackageNamePattern.IsMatch(request.PackageName))
             throw new ArgumentException("已安装的软件包名称无效。", nameof(request.PackageName));
