@@ -73,6 +73,36 @@ public static class ProcessChecks
             $"Process cancellation took {timer.Elapsed}, exceeding the cleanup bound.");
     }
 
+    [Check("process runner stops an oversized stdout producer during capture")]
+    public static async Task BoundsStdoutWhileReading()
+    {
+        var launcher = WithOutputLimit(TestLauncher("--emit-bytes"), "MaxStdoutBytes", 8 * 1024 * 1024);
+        var timer = Stopwatch.StartNew();
+        await Expect.ThrowsAsync<IOException>(() => new ProcessRunner().RunAsync(launcher,
+            ["stdout", (16 * 1024 * 1024).ToString(), "5000"], TimeSpan.FromSeconds(10), CancellationToken.None));
+        Expect.True(timer.Elapsed < TimeSpan.FromSeconds(4),
+            $"Oversized stdout was not stopped promptly ({timer.Elapsed}).");
+    }
+
+    [Check("process runner stops an oversized stderr producer during capture")]
+    public static async Task BoundsStderrWhileReading()
+    {
+        var launcher = WithOutputLimit(TestLauncher("--emit-bytes"), "MaxStderrBytes", 1024 * 1024);
+        var timer = Stopwatch.StartNew();
+        await Expect.ThrowsAsync<IOException>(() => new ProcessRunner().RunAsync(launcher,
+            ["stderr", (2 * 1024 * 1024).ToString(), "5000"], TimeSpan.FromSeconds(10), CancellationToken.None));
+        Expect.True(timer.Elapsed < TimeSpan.FromSeconds(4),
+            $"Oversized stderr was not stopped promptly ({timer.Elapsed}).");
+    }
+
+    private static CondaLauncher WithOutputLimit(CondaLauncher launcher, string propertyName, int limit)
+    {
+        var property = typeof(CondaLauncher).GetProperty(propertyName);
+        Expect.True(property is not null, $"CondaLauncher must define {propertyName}.");
+        property!.SetValue(launcher, limit);
+        return launcher;
+    }
+
     private static CondaLauncher TestLauncher(string mode)
     {
         var executable = Environment.ProcessPath ?? throw new Exception("Test process executable path is unavailable.");

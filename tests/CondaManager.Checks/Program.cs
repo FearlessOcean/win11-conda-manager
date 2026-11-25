@@ -28,6 +28,22 @@ public static class Program
             Console.Error.Write("requested exit");
             return int.Parse(args[1]);
         }
+        if (args.Length == 4 && args[0] == "--emit-bytes")
+        {
+            var output = args[1] == "stderr" ? Console.OpenStandardError() : Console.OpenStandardOutput();
+            var remaining = int.Parse(args[2]);
+            var chunk = new byte[64 * 1024];
+            Array.Fill(chunk, (byte)'x');
+            while (remaining > 0)
+            {
+                var count = Math.Min(remaining, chunk.Length);
+                await output.WriteAsync(chunk.AsMemory(0, count));
+                remaining -= count;
+            }
+            await output.FlushAsync();
+            await Task.Delay(int.Parse(args[3]));
+            return 0;
+        }
         if (args.Length == 2 && args[0] == "--probe-root")
         {
             var result = await new CondaLauncherValidator(new ProcessRunner())
