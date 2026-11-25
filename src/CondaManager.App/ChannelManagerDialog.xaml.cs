@@ -76,7 +76,7 @@ public partial class ChannelManagerDialog : Window
         try
         {
             var value = ChannelPolicy.Normalize(EntryText.Text);
-            var existing = _entries.FirstOrDefault(entry => string.Equals(entry, value, StringComparison.OrdinalIgnoreCase));
+            var existing = _entries.FirstOrDefault(entry => ChannelPolicy.NormalizedEntryComparer.Equals(entry, value));
             if (existing is null)
                 _entries.Add(value);
             ChannelList.SelectedItem = existing ?? value;

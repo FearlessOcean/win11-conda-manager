@@ -4,6 +4,8 @@ namespace CondaManager.Core;
 
 public static partial class ChannelPolicy
 {
+    public static IEqualityComparer<string> NormalizedEntryComparer { get; } = new ChannelEntryComparer();
+
     public static string Normalize(string channel)
     {
         ArgumentNullException.ThrowIfNull(channel);
@@ -43,6 +45,23 @@ public static partial class ChannelPolicy
 
     [GeneratedRegex("/t/[^/]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TokenPath();
+
+    private sealed class ChannelEntryComparer : IEqualityComparer<string>
+    {
+        public bool Equals(string? first, string? second)
+        {
+            if (first is null || second is null)
+                return first is null && second is null;
+            var firstIsUrl = IsUrl(first);
+            return firstIsUrl == IsUrl(second) && string.Equals(first, second,
+                firstIsUrl ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode(string entry) =>
+            (IsUrl(entry) ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase).GetHashCode(entry);
+
+        private static bool IsUrl(string entry) => entry.StartsWith("https://", StringComparison.Ordinal);
+    }
 }
 
 public sealed class ChannelSnapshot
@@ -58,7 +77,7 @@ public sealed class ChannelSnapshot
     {
         ArgumentNullException.ThrowIfNull(channels);
         var ordered = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(ChannelPolicy.NormalizedEntryComparer);
         foreach (var entry in channels)
         {
             var channel = ChannelPolicy.Normalize(entry);

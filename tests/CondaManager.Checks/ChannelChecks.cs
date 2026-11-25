@@ -47,8 +47,9 @@ public static class ChannelChecks
         var snapshot = ChannelSnapshot.Custom(channels);
         channels.Clear();
         Expect.True(snapshot.IsOverride, "Custom snapshots override configured channels.");
-        Expect.True(snapshot.Channels.SequenceEqual(["conda-forge", "https://repo.example.org/Main", "defaults"]),
-            "Deduplication must preserve the first entry and its position.");
+        Expect.True(snapshot.Channels.SequenceEqual(["conda-forge", "https://repo.example.org/Main",
+            "https://repo.example.org/main", "defaults"]),
+            "Names deduplicate without case, while URL paths preserve case-sensitive identity.");
         if (snapshot.Channels is IList<string> mutableChannels)
             Expect.Throws<NotSupportedException>(() => mutableChannels[0] = "other");
 
@@ -60,7 +61,8 @@ public static class ChannelChecks
 
         snapshot.AppendArguments(arguments);
         Expect.True(arguments.SequenceEqual(
-            ["search", "-c", "conda-forge", "-c", "https://repo.example.org/Main", "-c", "defaults", "--override-channels"]),
+            ["search", "-c", "conda-forge", "-c", "https://repo.example.org/Main",
+                "-c", "https://repo.example.org/main", "-c", "defaults", "--override-channels"]),
             "Custom snapshots append each channel in priority order followed by the override flag.");
     }
 

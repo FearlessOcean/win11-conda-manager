@@ -40,7 +40,8 @@ reads only name, version, build, subdir, and a safe display label for channel.
 Package fields must be printable bounded strings. A simple channel name is
 displayed directly; a URL is displayed as its host only, never its path,
 userinfo, query, or fragment. Other channel values display `来源未知`.
-It ignores raw URL and unrelated fields, refuses stdout longer than 8 MiB,
+It ignores raw URL and unrelated fields, stops reading and terminates a search
+whose stdout exceeds 8 MiB,
 limits displayed rows to 300, and reports when results are truncated. Missing,
 malformed or overlarge JSON is an error. `PackagesNotFoundError` and
 `PackagesNotFoundInChannelsError` in Conda's `exception_name` become an empty state;
@@ -50,11 +51,13 @@ results until the next explicit search, and shows which channel mode was used.
 
 Selecting a result enables `安装此版本` only when a non-base environment is
 currently selected. It opens the existing install form prefilled with name and
-version; the user can still edit them. The selected build is informational and
-is not pinned. The form explains that Conda may select a different build or
-channel, and the existing dry-run confirmation shows the actual planned
-transaction before any change. Closing search or declining confirmation does
-not invoke package installation.
+version; the user can still edit them. While the selected name and version
+remain unchanged, preview and apply use Conda's exact-version `name==version`
+MatchSpec. Editing either field returns to the manual version-prefix form.
+The selected build is informational and is not pinned. The form explains that
+Conda may select a different build or channel, and the existing dry-run
+confirmation shows the actual planned transaction before any change. Closing
+search or declining confirmation does not invoke package installation.
 
 ## Channel management
 
@@ -65,14 +68,17 @@ match `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` (including `defaults` or
 `conda-forge`). It also accepts an HTTPS URL without userinfo,
 query, fragment, whitespace, or a Conda `/t/<token>/` path. HTTP, `file://`,
 local paths, and credential-bearing URLs are rejected. Duplicates are removed
-after normalization using case-insensitive comparison. URL scheme and host
-are lowercased, trailing slashes are removed, and the path is preserved.
+after normalization. Channel names compare without case; HTTPS URLs compare
+with case-sensitive paths because repositories may distinguish path case.
+URL scheme and host are lowercased, trailing slashes are removed, and the
+path is preserved.
 The UI explains that names resolve through the user's
 existing Conda channel alias and warns that mixing incompatible channels can
 lead to dependency conflicts. The exact ordered list is visible before Save.
 
 The app persists a normalized root-to-profile map in an atomic JSON file.
-Malformed settings fall back to inherited mode with a visible diagnostic;
+Malformed settings entries fall back to inherited mode for their affected
+installation while valid entries remain available, with a visible diagnostic;
 write failures are reported without claiming persistence. Removing the last
 custom channel switches to inherited mode rather than passing an invalid
 `--override-channels` command. Profiles are loaded when an installation is
@@ -98,8 +104,9 @@ update/remove solver operations. All child processes retain
 Tests use fake runners and temporary app settings paths. They cover channel
 validation/order/persistence, search arguments and JSON cases, no-match,
 credentials in raw output, cancellation/stale results, inherited versus custom
-flags, and equal preview/apply channels. An offscreen WPF smoke loads both
-windows and the prefilled installation path. Automated checks do not mutate a
+flags, and equal preview/apply channels. The tracked `scripts/verify-wpf.ps1`
+offscreen smoke loads both windows and the prefilled installation path.
+Automated checks do not mutate a
 real Conda environment or `.condarc`. Full checks/build and self-contained
 `win-x64` publish must pass.
 

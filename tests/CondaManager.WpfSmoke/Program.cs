@@ -30,6 +30,15 @@ internal static class Program
             Click(channels, "SaveButton");
         });
         Check(Store.Saved.Channels.SequenceEqual(new[] {"conda-forge", "defaults"}), "saved channel order");
+        var caseEditor = new ChannelManagerDialog(Installation, Store.Saved, Search, Store);
+        Show(caseEditor, () =>
+        {
+            Add(caseEditor, "https://repo.example.org/Channels/Main");
+            Add(caseEditor, "https://repo.example.org/channels/main");
+            Check(Get<ListBox>(caseEditor, "ChannelList").Items.Count == 4,
+                "distinct case-sensitive URL paths remain separate");
+            caseEditor.Close();
+        });
         var canceledEditor = new ChannelManagerDialog(Installation, Store.Saved, Search, Store);
         Show(canceledEditor, () =>
         {
