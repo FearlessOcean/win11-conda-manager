@@ -1,7 +1,7 @@
 <Window x:Class="CondaManager.App.CreateEnvironmentDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="创建 Conda 虚拟环境" Width="650" Height="620" MinWidth="520" MinHeight="590"
+        Title="创建 Conda 虚拟环境" Icon="pack://application:,,,/CondaManager.App;component/Assets/AppIcon.ico" Width="650" Height="620" MinWidth="520" MinHeight="590"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
         Background="#F7F8FA" FontFamily="Segoe UI">
     <Grid Margin="24" Background="#F7F8FA">

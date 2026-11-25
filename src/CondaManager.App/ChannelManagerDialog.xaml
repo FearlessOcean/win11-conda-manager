@@ -1,7 +1,7 @@
 <Window x:Class="CondaManager.App.ChannelManagerDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="管理渠道" Width="620" Height="605" MinWidth="480" MinHeight="480"
+        Title="管理渠道" Icon="pack://application:,,,/CondaManager.App;component/Assets/AppIcon.ico" Width="620" Height="605" MinWidth="480" MinHeight="480"
         WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" Background="#F7F8FA">
     <DockPanel Margin="20">
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">

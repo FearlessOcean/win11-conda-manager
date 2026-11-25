@@ -2,6 +2,8 @@
 
 Windows 11 桌面应用，用于管理电脑上已有的 Conda、Miniconda 和 Miniforge 安装。
 
+应用图标采用绿色矢量设计；[SVG 源文件](src/CondaManager.App/Assets/AppIcon.svg)和多尺寸 ICO 均已纳入仓库。若需修改图标，可编辑 `scripts/generate-app-icon.py` 中的几何与配色，再安装 Pillow 并运行 `python .\scripts\generate-app-icon.py` 重新生成资源。正常构建和运行无需 Python。
+
 ## 当前进度
 
 第五阶段已实现可用包搜索与应用内渠道管理。应用会列出已验证的 Conda 安装和其已知环境。选中环境后，可查看完整存放位置、Python 版本、软件包数量，以及包的名称、版本、构建、渠道和来源，并按名称或版本筛选已安装的软件包。
@@ -58,7 +60,7 @@ pwsh -NoProfile -File .\scripts\verify.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-wpf.ps1
 ```
 
-该脚本使用模拟数据检查渠道编辑、可用包搜索、base 只读限制和搜索结果安装表单，不连接真实 Conda。
+该脚本使用模拟数据检查各窗口图标、渠道编辑、可用包搜索、base 只读限制和搜索结果安装表单，不连接真实 Conda。
 
 只读验证指定安装的启动器（将路径换成自己的安装根目录）：
 

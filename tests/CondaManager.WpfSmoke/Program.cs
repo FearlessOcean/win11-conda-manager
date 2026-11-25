@@ -16,6 +16,8 @@ internal static class Program
     public static void Main()
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        var create = new CreateEnvironmentDialog(Installation);
+        Show(create, create.Close);
         var channels = new ChannelManagerDialog(Installation, ChannelSnapshot.Inherit, Search, Store);
         Show(channels, () =>
         {
@@ -103,13 +105,14 @@ internal static class Program
         });
         TestLoadingEnvironmentTransition();
         app.Shutdown();
-        Console.WriteLine("PASS WPF fake channel management, repository search, base guard, install prefill, cancellation.");
+        Console.WriteLine("PASS WPF icon, fake channel management, repository search, base guard, install prefill, cancellation.");
     }
 
     private static void TestLoadingEnvironmentTransition()
     {
         const BindingFlags hidden = BindingFlags.NonPublic | BindingFlags.Instance;
         var main = new MainWindow { Left = -20000, Top = -20000, ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual };
+        Check(main.Icon is not null, "MainWindow icon");
         var loaded = typeof(MainWindow).GetMethod("Window_Loaded", hidden)!;
         main.Loaded -= (RoutedEventHandler)loaded.CreateDelegate(typeof(RoutedEventHandler), main);
         typeof(MainViewModel).GetField("_selectedInstallation", hidden)!.SetValue(main.Discovery, Installation);
@@ -155,6 +158,7 @@ internal static class Program
 
     private static void Show(Window dialog, Action test)
     {
+        Check(dialog.Icon is not null, $"{dialog.GetType().Name} icon");
         dialog.WindowStartupLocation = WindowStartupLocation.Manual;
         dialog.ShowInTaskbar = false;
         dialog.Left = -20000;
