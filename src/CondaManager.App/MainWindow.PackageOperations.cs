@@ -8,6 +8,75 @@ public partial class MainWindow
 {
     private readonly ICondaPackageOperator _packageOperator;
 
+    private readonly IChannelProfileStore _channelProfiles;
+    private readonly ICondaPackageSearch _packageSearch;
+    private ChannelSnapshot _channels = ChannelSnapshot.Inherit;
+    private PackageSearchDialog? _searchDialog;
+    private string? _channelWarning;
+
+    public bool CanBrowseChannels => CanInteract && !Discovery.IsScanning && Discovery.SelectedInstallation is not null;
+    public string ChannelModeLabel
+    {
+        get
+        {
+            if (Discovery.SelectedInstallation is null)
+                return string.Empty;
+            var mode = _channels.IsOverride ? $"自定义渠道（{_channels.Channels.Count}）" : "沿用 Conda 当前渠道";
+            return string.IsNullOrEmpty(_channelWarning) ? mode : $"{mode}。{_channelWarning}";
+        }
+    }
+
+    private void ReloadChannelProfile()
+    {
+        _searchDialog?.Close();
+        _channels = ChannelSnapshot.Inherit;
+        _channelWarning = null;
+        if (Discovery.SelectedInstallation is { } installation)
+        {
+            var profile = _channelProfiles.Load(installation.Info.RootPrefix);
+            _channels = profile.Snapshot;
+            _channelWarning = profile.Warning;
+        }
+        OnPropertyChanged(nameof(ChannelModeLabel));
+    }
+
+    private void ManageChannels_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanBrowseChannels || Discovery.SelectedInstallation is not { } installation)
+            return;
+        var dialog = new ChannelManagerDialog(installation, _channels, _packageSearch, _channelProfiles)
+            { Owner = this };
+        if (dialog.ShowDialog() == true)
+            ReloadChannelProfile();
+    }
+
+    private async void SearchPackages_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanBrowseChannels || Discovery.SelectedInstallation is not { } installation)
+            return;
+        var dialog = new PackageSearchDialog(installation, _channels, _packageSearch, CanInstallPackage)
+            { Owner = this };
+        void RefreshEligibility(object? source, System.ComponentModel.PropertyChangedEventArgs change)
+        {
+            if (change.PropertyName == nameof(CanInstallPackage))
+                dialog.SetInstallEligibility(CanInstallPackage && ReferenceEquals(Discovery.SelectedInstallation, installation));
+        }
+        PropertyChanged += RefreshEligibility;
+        _searchDialog = dialog;
+        try
+        {
+            if (dialog.ShowDialog() != true || dialog.ChosenPackage is null)
+                return;
+        }
+        finally
+        {
+            PropertyChanged -= RefreshEligibility;
+            _searchDialog = null;
+        }
+        if (CanInstallPackage && ReferenceEquals(Discovery.SelectedInstallation, installation))
+            await OpenInstallFormAsync(dialog.ChosenPackage);
+    }
+
     public bool CanInstallPackage => CanInteract && IsPackageTargetEligible;
 
     public bool CanChangeSelectedPackage => CanInstallPackage && SelectedCondaPackage is not null;
@@ -27,6 +96,7 @@ public partial class MainWindow
 
     private void NotifyPackageActionsChanged()
     {
+        OnPropertyChanged(nameof(CanBrowseChannels));
         OnPropertyChanged(nameof(CanInstallPackage));
         OnPropertyChanged(nameof(CanChangeSelectedPackage));
     }
@@ -34,18 +104,21 @@ public partial class MainWindow
     private void PackageSelection_Changed(object sender, SelectionChangedEventArgs e) =>
         NotifyPackageActionsChanged();
 
-    private async void InstallPackage_Click(object sender, RoutedEventArgs e)
+    private async void InstallPackage_Click(object sender, RoutedEventArgs e) => await OpenInstallFormAsync(null);
+
+    private async Task OpenInstallFormAsync(AvailablePackage? selected)
     {
         if (!CanInstallPackage || Discovery.SelectedInstallation is not { } installation ||
             Browser.SelectedEnvironment is not { } environment)
             return;
 
-        var dialog = new InstallPackageDialog(environment.Prefix) { Owner = this };
+        var dialog = new InstallPackageDialog(environment.Prefix, selected) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.PackageName is not { } packageName)
             return;
 
         var request = new PackageOperationRequest(installation, environment.Prefix, PackageAction.Install,
-            packageName, dialog.PackageVersion, null, GetPackageProtectedRoots());
+            packageName, dialog.PackageVersion, null, GetPackageProtectedRoots())
+            { Channels = _channels, ExactVersion = dialog.ExactVersion };
         if (CanInstallPackage && IsCurrentPackageRequest(request, environment))
             await RunPackageOperationAsync(request, environment);
     }
@@ -64,7 +137,7 @@ public partial class MainWindow
             return;
 
         var request = new PackageOperationRequest(installation, environment.Prefix, action,
-            package.Name, null, package, GetPackageProtectedRoots());
+            package.Name, null, package, GetPackageProtectedRoots()) { Channels = _channels };
         await RunPackageOperationAsync(request, environment);
     }
 

@@ -244,7 +244,15 @@
                             <Button Content="卸载选中项" Padding="12,6"
                                     IsEnabled="{Binding CanChangeSelectedPackage}" Click="RemovePackage_Click" />
                         </WrapPanel>
-                        <TextBlock Text="搜索软件包（名称或版本）" Style="{StaticResource MutedText}" Margin="0,0,0,5" />
+                        <WrapPanel Margin="0,0,0,6">
+                            <Button Content="搜索可用包" Padding="12,6" Margin="0,0,8,4"
+                                    IsEnabled="{Binding CanBrowseChannels}" Click="SearchPackages_Click" />
+                            <Button Content="管理渠道" Padding="12,6" Margin="0,0,10,4"
+                                    IsEnabled="{Binding CanBrowseChannels}" Click="ManageChannels_Click" />
+                            <TextBlock Text="{Binding ChannelModeLabel}" VerticalAlignment="Center"
+                                       TextWrapping="Wrap" Style="{StaticResource MutedText}" />
+                        </WrapPanel>
+                        <TextBlock Text="筛选已安装的软件包（名称或版本）" Style="{StaticResource MutedText}" Margin="0,0,0,5" />
                         <TextBox Text="{Binding Browser.PackageSearchText, UpdateSourceTrigger=PropertyChanged}"
                                  Padding="9,7" MinHeight="34" IsEnabled="{Binding CanInteract}" />
                     </StackPanel>

@@ -7,22 +7,22 @@
     <StackPanel Margin="24">
         <TextBlock Text="目标环境" Foreground="#647284" />
         <TextBlock x:Name="TargetTextBlock" TextWrapping="Wrap" Margin="0,4,0,8" />
-        <TextBlock Text="Conda 将使用已配置的渠道查找软件包。"
+        <TextBlock Text="构建和渠道由 Conda 求解，可能与搜索结果不同。请在变更预览中核对。"
                    Foreground="#647284" Margin="0,0,0,18" />
 
         <Label Target="{Binding ElementName=NameTextBox}" Content="软件包名称"
                Padding="0" FontWeight="SemiBold" />
         <TextBox x:Name="NameTextBox" MinHeight="34" Padding="8,6"
                  Margin="0,5,0,4" TextChanged="Input_TextChanged" />
-        <TextBlock Text="最多 64 个字符。以英文字母或数字开头，可包含下划线、连字符和句点。"
+        <TextBlock x:Name="NameHint" Text="最多 64 个字符。以英文字母或数字开头，可包含下划线、连字符和句点。"
                    Foreground="#647284" TextWrapping="Wrap" Margin="0,0,0,16" />
 
         <Label Target="{Binding ElementName=VersionTextBox}" Content="版本（可选）"
                Padding="0" FontWeight="SemiBold" />
         <TextBox x:Name="VersionTextBox" MinHeight="34" Padding="8,6"
                  Margin="0,5,0,4" TextChanged="Input_TextChanged" />
-        <TextBlock Text="例如 1.26 或 3.12.2。留空时由 Conda 选择版本。"
-                   Foreground="#647284" Margin="0,0,0,16" />
+        <TextBlock x:Name="VersionHint" Text="手动输入按版本前缀匹配，例如 1.26。留空时由 Conda 选择版本。"
+                   Foreground="#647284" TextWrapping="Wrap" Margin="0,0,0,16" />
 
         <TextBlock Text="软件包参数" FontWeight="SemiBold" />
         <Border Background="White" BorderBrush="#DDE2E8" BorderThickness="1"

@@ -112,6 +112,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _managedPrefixes = new ManagedPrefixStore();
         _operator = new CondaEnvironmentOperator(runner);
         _packageOperator = new CondaPackageOperator(runner);
+        _packageSearch = new CondaPackageSearch(runner);
+        _channelProfiles = new ChannelProfileStore();
         var discovery = new CondaDiscoveryService(new CondaLauncherValidator(runner));
         Discovery = new MainViewModel(discovery, settings, savedRoot =>
             CondaCandidateFinder.FindRoots(
@@ -174,7 +176,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             NotifyPackageActionsChanged();
         }
         if (e.PropertyName == nameof(MainViewModel.SelectedInstallation))
+        {
+            ReloadChannelProfile();
             await RunBrowserAsync(token => Browser.SetInstallationAsync(Discovery.SelectedInstallation, token));
+        }
     }
 
     private void Browser_PropertyChanged(object? sender, PropertyChangedEventArgs e)

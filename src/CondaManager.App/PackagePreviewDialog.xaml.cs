@@ -11,7 +11,7 @@ public partial class PackagePreviewDialog : Window
         InitializeComponent();
         var request = preview.Request;
         var spec = request.Action == PackageAction.Install
-            ? CondaPackageOperator.BuildInstallSpec(request.PackageName, request.Version)
+            ? CondaPackageOperator.BuildInstallSpec(request.PackageName, request.Version, request.ExactVersion)
             : request.PackageName;
         ActionTextBlock.Text = $"{GetActionLabel(request.Action)} {spec}";
         TargetTextBlock.Text = request.Prefix;
